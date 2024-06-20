@@ -6,6 +6,7 @@ from moviepy.editor import VideoFileClip, ImageClip, CompositeVideoClip
 video_extensions = ['.mp4','.avi', '.mkv', '.mov']
 image_extensions = ['.jpg', '.jpeg', '.png']
 
+#cria estrututa de pastas
 def create_directories(video_path, image_path, render_path):
 	try:
 		for path in [video_path, image_path, render_path]:
@@ -65,7 +66,7 @@ def apply_watermark(video_path, image_path, render_path):
 						# Configurações para usar CUDA no FFmpeg
 						video_with_watermark.write_videofile(
 							render_path,
-							codec='libx264',
+							codec='libx264', #codec padrao
 							fps=30,
 							threads=12,
 							ffmpeg_params=['-pix_fmt', 'yuv420p'],  # Parâmetros adicionais do ffmpeg

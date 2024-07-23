@@ -1,89 +1,94 @@
 import os
-import subprocess
+from tkinter import *
+from tkinter import filedialog
 from moviepy.editor import VideoFileClip, ImageClip, CompositeVideoClip
 
-# Extensões suportadas para vídeo e imagem
-video_extensions = ['.mp4','.avi', '.mkv', '.mov']
 image_extensions = ['.jpg', '.jpeg', '.png']
+video_extensions = ['.mp4','.avi', '.mkv', '.mov']
+window = Tk()
+window.title('Auto Watermark PP')
+window.geometry("400x200")
+window.config(background = "white")
 
-#cria estrututa de pastas
-def create_directories(video_path, image_path, render_path):
-	try:
-		for path in [video_path, image_path, render_path]:
-			if not os.path.exists(path):
-				os.makedirs(path)
-		return True
-	except OSError as e:
-		print(f"Erro ao criar os diretórios: {str(e)}")
+global image_path, video_path, render_path
 
-def extension_validation(video, image):
-	try:
-		# Verifica se as extensões dos arquivos de vídeo e imagem são suportadas.
-		video_extension = os.path.splitext(video)[1].lower()
-		image_extension = os.path.splitext(image)[1].lower()
-		if video_extension not in video_extensions:
-			print(f"O formato do vídeo {video} não é suportado.")
-			return False
-		
-		if image_extension not in image_extensions:
-			print(f"O formato da imagem {image} não é suportado.")
-			return False
-		return True
-	except OSError as e:
-		print(f"Erro ao validar as extensões: {str(e)}")
 
-def check_gpu_usage():
-	try:
-		result = subprocess.run(['nvidia-smi'], stdout=subprocess.PIPE)
-		print(result.stdout.decode('utf-8'))
-	except FileNotFoundError:
-		print("nvidia-smi não encontrado. Certifique-se de que os drivers NVIDIA estão instalados corretamente.")
+label_file_explorer = Label(window, 
+							text = "Projeto Auto Warermark - v1 Desktop",
+							width = 50, height = 2, 
+							fg = "blue")
 
-def apply_watermark(video_path, image_path, render_path):
-	# Listando os arquivos nos diretórios de vídeo e imagem
-	video_names = os.listdir(video_path)
-	image_names = os.listdir(image_path)
 
-	# Aplica uma marca d'água em vídeos com imagens correspondentes.
-	for video in video_names:
-		for image in image_names:
-			if extension_validation(video, image):
-				video_file = os.path.join(video_path, video)
-				image_file = os.path.join(image_path, image)
-				video_name = os.path.splitext(video)[0]
-				image_name = os.path.splitext(image)[0]
-				try:
-					if video_name == image_name:
-						video_clip = VideoFileClip(video_file)
-						image_clip = ImageClip(image_file)
-						image_clip = image_clip.set_duration(video_clip.duration)
-						video_with_watermark = CompositeVideoClip([video_clip, image_clip.set_position(('right','top'))])
-						render_path = os.path.join(render_path, f"{video_name}_rendered.mp4")
-						
-						print(f"Uso da GPU antes de processar {video_name}:")
-						check_gpu_usage()
-		
-						# Configurações para usar CUDA no FFmpeg
-						video_with_watermark.write_videofile(
+def browse_image_file():
+	global image_path
+	data = filedialog.askopenfilename(
+										initialdir = os.path.expanduser('~'),
+										title = "Selecione o arquivo de imagem",
+										filetypes = (
+											("Arquivos de imagem", image_extensions),
+										))
+	image_path =  os.path.abspath(data)
+
+ 
+def browse_video_file():
+	global video_path
+	data = filedialog.askopenfilename(
+										initialdir = os.path.expanduser('~'),
+										title = "Selecione o arquivo de video",
+										filetypes = (
+											("Arquivos de vídeo", video_extensions),
+										))
+	video_path =  os.path.abspath(data)
+	
+ 
+def destination_folder():
+	global render_path
+	data = filedialog.askdirectory()
+	render_path =  os.path.abspath(data)
+
+
+button_image_explore = Button(window, 
+						text = "Buscar marca d'água",
+						command = browse_image_file) 
+
+button_video_explore = Button(window, 
+						text = "Buscar vídeo",
+						command = browse_video_file) 
+
+button_destination_folder = Button(window, 
+						text = "Pasta de destino da renderização",
+						command = destination_folder) 
+
+def apply_watermark():
+	global image_path, video_path, render_path
+	video_name = 'teste'
+	video_clip = VideoFileClip(video_path)
+	image_clip = ImageClip(image_path)
+	image_clip = image_clip.set_duration(video_clip.duration)
+	video_with_watermark = CompositeVideoClip([video_clip, image_clip.set_position(('right','top'))])
+	render_path = os.path.join(render_path, f"{video_name}_rendered.mp4")
+	video_with_watermark.write_videofile(
 							render_path,
-							codec='libx264', #codec padrao
+							codec='libx264', #
 							fps=30,
 							threads=12,
-							ffmpeg_params=['-pix_fmt', 'yuv420p'],  # Parâmetros adicionais do ffmpeg
+							ffmpeg_params=['-pix_fmt', 'yuv420p'],  
 						)
-						print(f"Uso da GPU após processar {video_name}:")
-						check_gpu_usage()
-				except Exception as e:
-					print(f"Erro ao processar video {video_name}: {str(e)}")
 
-def main():
-	# Definindo os caminhos para os diretórios de vídeo e imagem
-	video_path = os.path.abspath("video")
-	image_path = os.path.abspath("watermark")
-	render_path = os.path.abspath("render")
+ 
+button_apply_watermark = Button(window, 
+						text = "Aplicar marca d'agua",
+						command = apply_watermark) 
 
-	create_directories(video_path, image_path, render_path)
-	apply_watermark(video_path, image_path, render_path)
+button_exit = Button(window, 
+					text = "Sair",
+					command = exit) 
 
-if __name__ == "__main__":
-	main()
+label_file_explorer.grid(column = 1, row = 1)
+button_image_explore.grid(column = 1, row = 2)
+button_video_explore.grid(column = 1, row = 3)
+button_destination_folder.grid(column = 1, row = 4)
+button_apply_watermark.grid(column = 1, row = 5)
+button_exit.grid(column = 1, row= 6)
+
+window.mainloop()

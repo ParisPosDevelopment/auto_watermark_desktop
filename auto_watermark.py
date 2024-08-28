@@ -1,11 +1,17 @@
 import os
 import time
+import shutil
+import re
+import subprocess
 from tkinter import *
 from tkinter import filedialog
 from tkinter.ttk import Progressbar
 from moviepy.editor import VideoFileClip, ImageClip, CompositeVideoClip
 from tqdm import tqdm
+import threading
 
+ffmpeg_path = 'C:\\Program Files\\ffmpeg-master-latest-win64-gpl\\bin'
+os.environ['PATH'] += os.pathsep + ffmpeg_path
 
 image_extensions = ['.jpg', '.jpeg', '.png']
 video_extensions = ['.mp4','.avi', '.mkv', '.mov']
@@ -76,44 +82,53 @@ resolution_var.set('1280x720')
 radio_button_1 = Radiobutton(root, text='1280x720 (HD)', value='1280x720', variable=resolution_var)
 radio_button_2 = Radiobutton(root, text='1920x1080 (Full HD)', value='1920x1080', variable=resolution_var)
 radio_button_3 = Radiobutton(root, text='3840x2160 (4K)', value='3840x2160', variable=resolution_var)
-progress_label = Label(root, text='Pré-processamento e Codificação:')
-progress = Progressbar(root, orient=HORIZONTAL, length=300, mode='determinate')
 
-progress_final_label = Label(root, text='Criação Final do Arquivo:')
-progress_final = Progressbar(root, orient=HORIZONTAL, length=300, mode='determinate')
+progress = Progressbar(root, orient=HORIZONTAL, length=300, mode='indeterminate')
 
-def update_progress_bar(progress_percentage):
-	progress['value'] = progress_percentage
-	root.update_idletasks()
+def check_ffmpeg():
+	ffmpeg_path = shutil.which('ffmpeg')
+	if ffmpeg_path:
+		print("FFmpeg encontrado em:", ffmpeg_path)
+		return ffmpeg_path
+	else:
+		print("FFmpeg não encontrado. Certifique-se de que o FFmpeg está instalado e no PATH.")
+		exit(1)
 
-def apply_watermark():
-	global image_path, video_path, render_path
+def apply_watermark_thread():
+	global image_path, video_path, render_path, ffmpeg_path
 	video_name = str(render_title.get('1.0','end')).strip() + ".mp4"
- 
-	video_clip = VideoFileClip(video_path)
 	resolution = resolution_var.get()
 	width, height = map(int, resolution.split('x'))
-	video_clip = video_clip.resize(newsize=(width, height))
-	image_clip = ImageClip(image_path)
-	image_clip = image_clip.set_duration(video_clip.duration)
-	video_with_watermark = CompositeVideoClip([video_clip, image_clip.set_position(('right','top'))])
 	render_path = os.path.join(render_path, video_name)
-	def update_progress():
-		for iteration in tqdm(range(100), desc="Rendering", leave=False):
-			time.sleep(video_clip.duration / 100)
-			progress_percentage = (iteration + 1)
-			update_progress_bar(progress_percentage)
-	update_progress() 
+	ffmpeg_path = check_ffmpeg()
+	command = [
+				ffmpeg_path,
+				'-hwaccel', 'cuda',
+				'-i', video_path,
+				'-i', image_path,
+				'-filter_complex', f'[0:v]scale={width}:{height}[scaled];[scaled][1:v]overlay=W-w-10:H-h-10',
+				'-c:v', 'h264_nvenc', 
+				'-pix_fmt', 'yuv420p',
+				'-preset', 'fast',
+				render_path
+		]
+
+	try:
+		print("Aplicando marca d'água...")
+		progress.start()
+		subprocess.run(command, check=True)
+		print("Marca d'água aplicada com sucesso!")
+	except subprocess.CalledProcessError as e:
+		print(f"Erro ao aplicar a marca d'água: {e}")
+	except FileNotFoundError as e:
+		print(f"Arquivo não encontrado: {e}")
+	finally:
+		progress.stop()
+
+def apply_watermark():
+	thread = threading.Thread(target=apply_watermark_thread)
+	thread.start()	
  
-	video_with_watermark.write_videofile(
-			render_path,
-			codec='libx264', 
-			fps=30,
-			threads=12,
-			ffmpeg_params=['-pix_fmt', 'yuv420p'],  
-	)
-	update_progress_bar(100) 
-    
 button_apply_watermark = Button(root, 
 						text = "Aplicar",
 						command = apply_watermark) 
@@ -141,10 +156,6 @@ button_apply_watermark.grid(column=0, row=4, columnspan=3, padx=5, pady=10, stic
 
 button_exit.grid(column=0, row=5, columnspan=3, padx=5, pady=5, sticky="ew")
 
-progress_label.grid(column=0, row=6, columnspan=3, padx=10, pady=10)
 progress.grid(column=0, row=7, columnspan=3, padx=10, pady=10)
-
-progress_final_label.grid(column=0, row=8, columnspan=3, padx=10, pady=10)
-progress_final.grid(column=0, row=9, columnspan=3, padx=10, pady=10)
 
 root.mainloop()

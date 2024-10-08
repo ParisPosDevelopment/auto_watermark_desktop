@@ -87,6 +87,8 @@ formato_var = StringVar()
 formato_var.set('.mov')
 codec_var = StringVar()
 codec_var.set('proxy')
+bitrate_var = StringVar()
+bitrate_var.set('16000')
 
 resolution_combo = Combobox(root, textvariable=resolution_var, values=['1280x720', '1920x1080', '3840x2160'])
 resolution_combo.grid(column=0, row=3, padx=5, pady=5, sticky="w")
@@ -115,6 +117,17 @@ def check_ffmpeg():
 		print("FFmpeg não encontrado. Certifique-se de que o FFmpeg está instalado e no PATH.")
 		exit(1)
 
+bitrate_entry = Entry(root, textvariable=bitrate_var, width=10)
+
+def update_bitrate_entry(*args):
+    if codec_var.get() == 'h264':
+        bitrate_entry.grid(column=2, row=6, padx=5, pady=5, sticky="w")
+    else:
+        bitrate_entry.grid_remove()
+
+# Conecte a função ao evento de mudança do combobox de formato
+codec_var.trace('w', update_bitrate_entry)
+
 def apply_watermark_thread():
     global image_path, video_path, render_path, ffmpeg_path
     codec = codec_var.get()
@@ -125,6 +138,7 @@ def apply_watermark_thread():
     width, height = map(int, resolution.split('x'))
     render_path = os.path.join(render_path, video_name)
     ffmpeg_path = check_ffmpeg()
+    bitrate = bitrate_var.get() if codec == 'h264' else '14000'
 
     # Initialize command base
     command = [
@@ -142,6 +156,7 @@ def apply_watermark_thread():
             '-c:v', 'h264_nvenc',
             '-pix_fmt', 'yuv420p',
             '-preset', 'fast',
+            '-b:v', bitrate,
         ])
     elif codec == 'proxy':
         command.extend([

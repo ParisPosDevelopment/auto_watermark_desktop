@@ -88,7 +88,7 @@ formato_var.set('.mov')
 codec_var = StringVar()
 codec_var.set('proxy')
 bitrate_var = StringVar()
-bitrate_var.set('16000')
+bitrate_var.set('13000')
 
 resolution_combo = Combobox(root, textvariable=resolution_var, values=['1280x720', '1920x1080', '3840x2160'])
 resolution_combo.grid(column=0, row=3, padx=5, pady=5, sticky="w")
@@ -106,6 +106,8 @@ codec_combo = Combobox(root, textvariable=codec_var, values=['proxy', 'h264'])
 codec_combo.grid(column=0, row=6, padx=5, pady=5, sticky="w")
 codec_combo.current(0)
 
+bitrate_combo = Combobox(root, textvariable=bitrate_var, values=['16000', '13000', '10000', '6000', '2000'])
+
 progress = Progressbar(root, orient=HORIZONTAL, length=300, mode='determinate')
 
 def check_ffmpeg():
@@ -117,16 +119,14 @@ def check_ffmpeg():
 		print("FFmpeg não encontrado. Certifique-se de que o FFmpeg está instalado e no PATH.")
 		exit(1)
 
-bitrate_entry = Entry(root, textvariable=bitrate_var, width=10)
-
-def update_bitrate_entry(*args):
+def update_bitrate_combo(*args):
     if codec_var.get() == 'h264':
-        bitrate_entry.grid(column=2, row=6, padx=5, pady=5, sticky="w")
+        bitrate_combo.grid(column=2, row=6, padx=5, pady=5, sticky="w")
     else:
-        bitrate_entry.grid_remove()
+        bitrate_combo.grid_remove()
 
 # Conecte a função ao evento de mudança do combobox de formato
-codec_var.trace('w', update_bitrate_entry)
+codec_var.trace('w', update_bitrate_combo)
 
 def apply_watermark_thread():
     global image_path, video_path, render_path, ffmpeg_path
@@ -138,7 +138,7 @@ def apply_watermark_thread():
     width, height = map(int, resolution.split('x'))
     render_path = os.path.join(render_path, video_name)
     ffmpeg_path = check_ffmpeg()
-    bitrate = bitrate_var.get() if codec == 'h264' else '14000'
+    bitrate = bitrate_var.get() + 'k' if codec == 'h264' else '13000k'
 
     # Initialize command base
     command = [
@@ -151,7 +151,14 @@ def apply_watermark_thread():
     ]
     
     # Add codec-specific options
-    if codec == 'h264':
+    if formato == ".mov" and codec == 'h264':
+        command.extend([
+            '-c:v', 'h264_nvenc',
+            '-pix_fmt', 'yuv420p',
+            '-preset', 'fast',
+            '-b:v', bitrate,
+        ])
+    elif formato == ".mp4" and codec == 'h264':
         command.extend([
             '-c:v', 'h264_nvenc',
             '-pix_fmt', 'yuv420p',

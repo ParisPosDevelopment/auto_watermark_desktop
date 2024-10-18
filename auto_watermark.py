@@ -4,13 +4,8 @@ import shutil
 import re
 import subprocess
 from tkinter import *
-<<<<<<< HEAD
-from tkinter import filedialog, messagebox
-from tkinter.ttk import Progressbar
-=======
 from tkinter import filedialog
 from tkinter.ttk import Progressbar, Combobox
->>>>>>> feature-limitador_bitrate
 from moviepy.editor import VideoFileClip, ImageClip, CompositeVideoClip
 from tqdm import tqdm
 import threading
@@ -20,11 +15,7 @@ ffmpeg_path = 'C:\\Program Files\\ffmpeg-master-latest-win64-gpl\\bin'
 os.environ['PATH'] += os.pathsep + ffmpeg_path
 
 image_extensions = ['.jpg', '.jpeg', '.png']
-<<<<<<< HEAD
-video_extensions = ['.mp4', '.avi', '.mkv', '.mov']
-=======
 video_extensions = ['.mp4','.avi', '.mkv', '.mov', '.mxf']
->>>>>>> feature-limitador_bitrate
 root = Tk()
 root.title('Auto Watermark PP')
 
@@ -115,9 +106,6 @@ render_title_label = Label(root, text='Título da renderização:')
 render_title = Text(root, height=1, width=10)
 
 resolution_var = StringVar()
-<<<<<<< HEAD
-resolution_var.set('1280x720')
-=======
 resolution_var.set('1280x720') 
 framerate_var = StringVar()
 framerate_var.set('23.976')
@@ -127,7 +115,6 @@ codec_var = StringVar()
 codec_var.set('proxy')
 bitrate_var = StringVar()
 bitrate_var.set('16000')
->>>>>>> feature-limitador_bitrate
 
 resolution_combo = Combobox(root, textvariable=resolution_var, values=['1280x720', '1920x1080', '3840x2160'])
 resolution_combo.grid(column=0, row=3, padx=5, pady=5, sticky="w")
@@ -169,36 +156,6 @@ codec_var.trace('w', update_bitrate_entry)
 
 def apply_watermark_thread():
     global image_path, video_path, render_path, ffmpeg_path
-<<<<<<< HEAD
-    video_name = str(render_title.get('1.0', 'end')).strip() + ".mp4"
-    resolution = resolution_var.get()
-    width, height = map(int, resolution.split('x'))
-    render_path = os.path.join(render_path, video_name)
-    ffmpeg_path = check_ffmpeg()
-    command = [
-        ffmpeg_path,
-        '-hwaccel', 'cuda',
-        '-i', video_path,
-        '-i', image_path,
-        '-filter_complex', f'[0:v]scale={width}:{height}[scaled];[scaled][1:v]overlay=W-w-10:H-h-10',
-        '-c:v', 'h264_nvenc', 
-        '-pix_fmt', 'yuv420p',
-        '-preset', 'fast',
-        render_path
-    ]
-
-    try:
-        print("Aplicando marca d'água...")
-        progress.start()
-        subprocess.run(command, check=True)
-        print("Marca d'água aplicada com sucesso!")
-    except subprocess.CalledProcessError as e:
-        print(f"Erro ao aplicar a marca d'água: {e}")
-    except FileNotFoundError as e:
-        print(f"Arquivo não encontrado: {e}")
-    finally:
-        progress.stop()
-=======
     codec = codec_var.get()
     formato = formato_var.get()
     video_name = str(render_title.get('1.0', 'end')).strip() + formato
@@ -236,7 +193,6 @@ def apply_watermark_thread():
     else:
         print(f"Codec não suportado: {codec}")
         return
->>>>>>> feature-limitador_bitrate
 
     # Add render path
     command.append(render_path)
@@ -285,23 +241,13 @@ selected_paths_label.grid(column=0, row=2, padx=5, pady=5, sticky="e")
 render_title_label.grid(column=0, row=2, padx=5, pady=5, sticky="e")
 render_title.grid(column=1, row=2, padx=5, pady=5, columnspan=2, sticky="ew")
 
-button_apply_watermark.grid(column=0, row=7, columnspan=3, padx=5, pady=10, sticky="ew")
-
-<<<<<<< HEAD
-button_apply_watermark.grid(column=0, row=4, columnspan=3, padx=5, pady=10, sticky="ew")
-button_exit.grid(column=0, row=5, columnspan=3, padx=5, pady=5, sticky="ew")
-
-progress.grid(column=0, row=6, columnspan=3, padx=10, pady=10)
-=======
-button_exit.grid(column=0, row=9, columnspan=3, padx=5, pady=5, sticky="ew")
-
-progress.grid(column=0, row=8, columnspan=3, padx=10, pady=10)
->>>>>>> feature-limitador_bitrate
-
-# Exibir paths selecionados
 selected_paths_label.grid(column=0, row=7, columnspan=3, pady=10)
 
-# Carregar paths salvos ao iniciar
+progress.grid(column=0, row=8, columnspan=3, padx=10, pady=10)
+button_apply_watermark.grid(column=0, row=9, columnspan=3, padx=5, pady=10, sticky="ew")
+button_exit.grid(column=0, row=10, columnspan=3, padx=5, pady=5, sticky="ew")
+
+
 load_paths()
 update_selected_paths()
 

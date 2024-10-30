@@ -23,7 +23,8 @@ for j in range(3):
 	root.grid_columnconfigure(j, weight=1)
 
 # Variáveis globais
-global image_path, render_path, video_queue
+global image_path, render_path, video_queue, process
+process = None
 image_path = ''
 render_path = ''
 video_queue = []  # Lista para armazenar os vídeos a serem renderizados
@@ -104,7 +105,6 @@ codec_var.set('proxy')
 bitrate_var = StringVar()
 bitrate_var.set('16000')
 
-progress = Progressbar(root, orient=HORIZONTAL, length=300, mode='determinate')
 # data = filedialog.askdirectory()
 # render_path = os.path.abspath(data)
 
@@ -176,8 +176,28 @@ def update_bitrate_entry(*args):
 # Conecte a função ao evento de mudança do combobox de formato
 codec_var.trace('w', update_bitrate_entry)
 
+
+def get_video_frame_count(video_path):
+	command = [
+		'ffmpeg',
+		'-i', video_path,
+		'-map', '0:v:0',  # Pega apenas a primeira faixa de vídeo
+		'-c', 'copy',
+		'-f', 'null',  # Usa 'null' para não gerar saída
+		'/dev/null'  # Este caminho não é usado
+	]
+	
+	process = subprocess.Popen(command, stderr=subprocess.PIPE, universal_newlines=True)
+	for line in process.stderr:
+		if 'frame=' in line:
+			frame_info = re.search(r"frame=\s*(\d+)", line)
+			if frame_info:
+				return int(frame_info.group(1))
+	return 0
+
+
 def apply_watermark_thread():
-	global image_path, video_path, render_path, ffmpeg_path
+	global image_path, video_path, render_path, ffmpeg_path, process
 	codec = codec_var.get()
 	formato = formato_var.get()
 	video_name = str(render_title.get('1.0', 'end')).strip() + formato
@@ -187,6 +207,12 @@ def apply_watermark_thread():
 	render_path = os.path.join(render_path, video_name)
 	ffmpeg_path = check_ffmpeg()
 	bitrate = bitrate_var.get() if codec == 'h264' else '14000'
+
+	# Obtém o número total de frames
+	total_frames = get_video_frame_count(video_path)
+	if total_frames == 0:
+		messagebox.showerror("Erro", "Não foi possível determinar o número total de frames.")
+		return
 
 	# Initialize command base
 	command = [
@@ -221,22 +247,31 @@ def apply_watermark_thread():
 
 	try:
 		print("Aplicando marca d'água...")
+		progress['mode'] = 'determinate'  # Muda para 'determinate'
+		progress['maximum'] = total_frames   # Define o máximo para o total de frames
 		progress.start()
+		
 		# Open subprocess and capture output
 		process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
 
 		# Read and monitor output
 		for line in process.stderr:
 			if "frame=" in line:
-				# Extract frame count from output
 				frame_info = re.search(r"frame=\s*(\d+)", line)
 				if frame_info:
 					frame_count = int(frame_info.group(1))
-					# Update progress (example: assuming 1000 frames)
-					progress['value'] = (frame_count / frame_count) * 100
+					progress['value'] = frame_count
+					percentage = (frame_count / total_frames) * 100
+					percentage_label.config(text=f"{percentage:.2f}%")
 					root.update_idletasks()
 		
 		process.wait()  # Wait for the process to complete
+
+		# Finalize progress and percentage
+		progress['value'] = total_frames  # Definir valor máximo
+		percentage_label.config(text="100.00%")  # Garantir que mostre 100%
+		
+		
 		print("Marca d'água aplicada com sucesso!")
 	except subprocess.CalledProcessError as e:
 		print(f"Erro ao aplicar a marca d'água: {e}")
@@ -244,12 +279,13 @@ def apply_watermark_thread():
 		print(f"Arquivo não encontrado: {e}")
 	finally:
 		progress.stop()
+		process = None
 def render_videos():
-    if not video_queue:
-        messagebox.showwarning("Fila vazia", "Adicione vídeos à fila antes de renderizar.")
-        return
-    thread = threading.Thread(target=render_videos_thread)
-    thread.start()
+	if not video_queue:
+		messagebox.showwarning("Fila vazia", "Adicione vídeos à fila antes de renderizar.")
+		return
+	thread = threading.Thread(target=render_videos_thread)
+	thread.start()
 def apply_watermark():
 	thread = threading.Thread(target=apply_watermark_thread)
 	thread.start()
@@ -260,27 +296,28 @@ button_image_explore = Button(root, text="Buscar marca d'água", command=browse_
 button_video_explore = Button(root, text="Buscar vídeo", command=browse_video_file)
 button_destination_folder = Button(root, text="Destino da renderização", command=destination_folder)
 
+button_video_explore.grid(column=0, row=2, padx=5, pady=5, sticky="ew")
 button_add_video = Button(root, text="Adicionar Vídeo à Fila", command=add_video_to_queue)
-button_add_video.grid(column=0, row=2, padx=5, pady=5, sticky="ew")
+button_add_video.grid(column=0, row=3, padx=5, pady=5, sticky="ew")  # Mover para linha 3
 
 # Combobox para resolução
 resolution_combo = Combobox(root, textvariable=resolution_var, values=['1280x720', '1920x1080', '3840x2160'])
-resolution_combo.grid(column=0, row=3, padx=5, pady=5, sticky="w")
+resolution_combo.grid(column=0, row=4, padx=5, pady=5, sticky="w")
 resolution_combo.current(0)
 
 # Combobox para taxa de quadros
 framerate_combo = Combobox(root, textvariable=framerate_var, values=['23.976', '24', '30'])
-framerate_combo.grid(column=1, row=3, padx=5, pady=5, sticky="w")
+framerate_combo.grid(column=1, row=4, padx=5, pady=5, sticky="w")
 framerate_combo.current(0)
 
 # Combobox para formato
 format_combo = Combobox(root, textvariable=formato_var, values=['.mov', '.mp4'])
-format_combo.grid(column=0, row=4, padx=5, pady=5, sticky="w")
+format_combo.grid(column=0, row=5, padx=5, pady=5, sticky="w")
 format_combo.current(0)
 
 # Combobox para codec
 codec_combo = Combobox(root, textvariable=codec_var, values=['proxy', 'h264'])
-codec_combo.grid(column=1, row=4, padx=5, pady=5, sticky="w")
+codec_combo.grid(column=1, row=5, padx=5, pady=5, sticky="w")
 codec_combo.current(0)
 
 label_file_explorer.grid(column=0, row=0, columnspan=3, pady=10)
@@ -288,28 +325,31 @@ button_image_explore.grid(column=0, row=1, padx=5, pady=5, sticky="ew")
 
 button_destination_folder.grid(column=1, row=1, padx=5, pady=5, sticky="ew")
 
-render_title_label.grid(column=0, row=2, padx=5, pady=5, sticky="e")
-render_title.grid(column=1, row=2, padx=5, pady=5, columnspan=2, sticky="ew")
+render_title_label.grid(column=0, row=6, padx=5, pady=5, sticky="e")
+render_title.grid(column=1, row=6, padx=5, pady=5, columnspan=2, sticky="ew")
 
 selected_paths_label.grid(column=0, row=13, padx=5, pady=5, sticky="e")
-
 selected_paths_label.grid(column=0, row=7, columnspan=3, pady=10)
 
 video_listbox = Listbox(root, width=50, height=10)
-video_listbox.grid(column=0, row=5, columnspan=3, padx=10, pady=10)
+video_listbox.grid(column=0, row=8, columnspan=3, padx=10, pady=10)
 
 button_render_videos = Button(root, text="Renderizar Vídeos", command=render_videos)
-button_render_videos.grid(column=0, row=6, columnspan=3, padx=5, pady=10, sticky="ew")
-progress.grid(column=0, row=8, columnspan=3, padx=10, pady=10)
+button_render_videos.grid(column=0, row=9, columnspan=3, padx=5, pady=10, sticky="ew")
 
 button_apply_watermark = Button(root, text="Aplicar", command=apply_watermark)
-button_apply_watermark.grid(column=0, row=9, columnspan=3, padx=5, pady=10, sticky="ew")
+button_apply_watermark.grid(column=0, row=10, columnspan=3, padx=5, pady=10, sticky="ew")
 
 button_exit = Button(root, text="Sair", command=root.quit)
-button_exit.grid(column=0, row=10, columnspan=3, padx=5, pady=5, sticky="ew")
+button_exit.grid(column=0, row=11, columnspan=3, padx=5, pady=5, sticky="ew")
 
 load_paths()
 update_selected_paths()
-progress.grid(column=0, row=8, columnspan=3, padx=10, pady=10)
+# Cria a barra de progresso
+progress = Progressbar(root, orient=HORIZONTAL, length=300, mode='indeterminate')
+progress.grid(column=0, row=12, columnspan=2, padx=7, pady=5)  
+
+percentage_label = Label(root, text="0%")
+percentage_label.grid(column=2, row=12, padx=5, pady=5)  # Mantendo a coluna 2 para evitar sobreposição
 
 root.mainloop()
